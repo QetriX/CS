@@ -16,7 +16,8 @@ namespace com.qetrix.libs
 	{
 		private static QPage _instance; // Static reference to current QetriX Page
 
-		private string _appName = ""; // App Name. Recommended 1-16 chars, [a-z][0-9] only. Used in paths, keys, possibly ds conn etc.
+		private Dictionary<string, string> _sessionData = new Dictionary<string, string>(); // HashMap<String, String>
+
 		private string _text = ""; // Language specific, appropriate to _name
 		private string _authTokenName = "_t";
 		private Dictionary<string, DataStore> _dsList = new Dictionary<string, DataStore>(); // HashMap<String, DataStore>
@@ -28,11 +29,14 @@ namespace com.qetrix.libs
 		private Dictionary<string, string> _lbl = new Dictionary<string, string>(); // Array of labels in current language
 		private List<string> _messages = new List<string>(); // TODO: List<QMessage>
 		private List<string> _log = new List<string>(); // TODO: List<QMessage>
-		private Dictionary<string, string> _args; // HashMap<String, String>
-		private Dictionary<string, string> _data; // HashMap<String, String>
+		private Dictionary<string, string> _args = new Dictionary<string, string>(); // HashMap<String, String>
+		private Dictionary<string, string> _data = new Dictionary<string, string> { // HashMap<String, String>
+			{ "request_protocol", "" },
+			{ "http_host", "" },
+		};
 		private Dictionary<string, string> _formData = null; // HashMap<String, String>; null = no form data
 		private Dictionary<string, string> _config = new Dictionary<string, string>{
-			{ "appName", ""},
+			{ "appName", ""}, // App Name. Recommended 1-16 chars, [a-z][0-9] only. Used in paths, keys, possibly ds conn etc.
 			{ "text", ""},
 			{ "siteName", ""},
 			{ "uid", ""},
@@ -46,12 +50,12 @@ namespace com.qetrix.libs
 		private string _pathResCommon; // Common resource path, e.g. /qetrix/common/res/ (CDN ready)
 		private string _pathContent; // Content path, e.g.  /qetrix/myapp/content/ (CDN ready)
 
-		private string _pathRoot; // Script root path, e.g. /mnt/data/www/qetrix/
-		private string _pathApp; // App root path, e.g. /mnt/data/www/qetrix/apps/myapp/
-		private string _pathAppCommon; // App root path, e.g. /mnt/data/www/qetrix/apps/common/
-		private string _pathAppContent; // App content path, e.g. /mnt/data/www/qetrix/apps/myapp/content/
-		private string _pathAppData; // App data path, e.g. /mnt/data/www/qetrix/apps/myapp/data/
-		private string _pathAppVars; // App vars path, e.g. /mnt/data/www/qetrix/vars/myapp/
+		private string _pathRoot; // Script root path, e.g. /var/www/qetrix/
+		private string _pathApp; // App root path, e.g. /var/www/qetrix/apps/myapp/
+		private string _pathAppCommon; // App root path, e.g. /var/www/qetrix/apps/common/
+		private string _pathAppContent; // App content path, e.g. /var/www/qetrix/apps/myapp/content/
+		private string _pathAppData; // App data path, e.g. /var/www/qetrix/apps/myapp/data/
+		private string _pathAppVars; // App vars path, e.g. /var/www/qetrix/vars/myapp/
 
 		private int _isMultiApp = 0; // Uses this QetriX multi-page mode? (looks for /apps/ subdir in QetriX root dir)
 		private string defaultModule = ""; // What module should be used as default, when requested module wasn't found
@@ -66,20 +70,22 @@ namespace com.qetrix.libs
 		{
 			_config.Add("fwk", Assembly.GetEntryAssembly()?.GetCustomAttribute<System.Runtime.Versioning.TargetFrameworkAttribute>()?.FrameworkName.Substring(4, 4).ToLower());
 
+			AppDomain.CurrentDomain.AssemblyResolve -= autoload_register;
 			AppDomain.CurrentDomain.AssemblyResolve += autoload_register;
 			init();
 		}
 
 		/** Returns instance of QPage */
-		public static QPage getInstance()
+		public static QPage getInstance(bool init = false)
 		{
-			if (_instance == null) _instance = new QPage();
+			if (_instance == null || init) _instance = new QPage();
 			return _instance;
 		}
 
 		private void init()
 		{
 			_config["uid"] = getUID();
+			_formData = null;
 		}
 
 		private string getUID()
@@ -143,6 +149,12 @@ namespace com.qetrix.libs
 			return this._pathBase;
 		}
 
+		public string pathFull(string value = null)
+		{
+			// return this._data["request_protocol"] + "://" + this._data["http_host"] + this.pathBase() + (value == null ? this._path : value);
+			return string.Format("{0}://{1}{2}{3}", this._data["request_protocol"], this._data["http_host"], this.pathBase(), value == null ? this._path : value);
+		}
+
 		/** HTML Client content path */
 		public string pathContent()
 		{
@@ -163,12 +175,12 @@ namespace com.qetrix.libs
 
 		public string appName()
 		{
-			return this._appName;
+			return this._config["appName"];
 		}
 
 		public QPage appName(string value)
 		{
-			this._appName = value;
+			this._config["appName"] = value;
 			return this;
 		}
 
@@ -287,7 +299,7 @@ namespace com.qetrix.libs
 		 */
 		public bool hasFormData()
 		{
-			return this._formData.Count > 0;
+			return this._formData != null && this._formData.Count > 0;
 		}
 
 		public bool hasFormData(string key)
@@ -346,18 +358,18 @@ namespace com.qetrix.libs
 			var page = new Dict();
 			if (aPath.Count == 0) return page;
 
-			if (_appName == "") {
-				_appName = aPath[0];
+			if (this._config["appName"] == "") {
+				this._config["appName"] = aPath[0];
 				aPath.RemoveAt(0);
 			}
 
-			page.set("app", _appName);
+			page.set("app", this._config["appName"]);
 
 			if (aPath.Count > 0) {
 				page.set(int.TryParse(aPath[0], out int n) ? "id" : "mod", aPath[0]);
 				aPath.RemoveAt(0);
 			} else {
-				page.set("mod", _appName);
+				page.set("mod", this._config["appName"]);
 			}
 
 			if (aPath.Count > 0) {
@@ -388,7 +400,7 @@ namespace com.qetrix.libs
 
 			string dir = AppDomain.CurrentDomain.BaseDirectory.Replace("\\", "/").TrimEnd('/') + "/";
 			string name = args.Name.Split(',')[0] + ".dll";
-			foreach (string subdir in new string[] { "libs/", "modules/", "datastores/", "converters/"}) {
+			foreach (string subdir in new string[] { "libs/", "modules/", "datastores/", "converters/" }) {
 				if (!File.Exists(dir + subdir + name)) continue;
 				return _config["fwk"] == "fram" ? loadAssemblyNet(dir + subdir + name) : loadAssemblyCore(dir + subdir + name);
 			}
@@ -405,46 +417,48 @@ namespace com.qetrix.libs
 			return Assembly.LoadFile(file);
 		}
 
+		public void and (string x)
+			{
+			}
+
 		public string loadModule(string path, PathMode pathMode)
 		{
 			var page = this.parsePath(path);
 
 			if (pathMode != PathMode.direct) {
-				string mod = page.get("mod");
+
+				string mod = page.get("mod"), func = page.get("func");
 				mod = mod.Length > 0 ? mod.Substring(0, 1).ToUpper() + mod.Substring(1) : appName();
 				if (mod == "") mod = "qetrix";
 
-				/*var modDir = AppDomain.CurrentDomain.BaseDirectory.Replace("\\", "/").TrimEnd('/') + "/";
-				// var modFile = modDir + "modules/" + mod + ".dll";
-				var modFile = modDir + "modules/" + mod + ".dll";
-
-				if (!File.Exists(modFile)) return "Module not found: " + modFile;
-				Assembly myAssembly = null;
-				try {
-					myAssembly = loadAssemblyCore(modFile);
-				} catch {
-					myAssembly = loadAssemblyNet(modFile);
-				}
-				if (myAssembly == null) return "Invalid module " + mod + " in " + modFile;
-
-				Type myType = null;
-				myType = myAssembly.GetType("com.qetrix.modules." + mod);
-				// if (myType == null) myType = myAssembly.GetType("com.qetrix.modules." + mod);
-				if (myType == null) return "Unknown module: " + mod;*/
+				// Handle keywords, add trailing underscore; '/list' in URL => function list_(Dict $args)
+				var keywords = new string[] { "abstract", "and", "array", "as", "bool", "break", "callable", "case", "catch", "class", "clone", "const", "continue", "declare", "default", "die", "do", "echo", "else", "elseif", "empty", "enddeclare", "endfor", "endforeach", "endif", "endswitch", "endwhile", "eval", "exit", "extends", "false", "final", "float", "for", "foreach", "function", "global", "goto", "if", "implements", "include", "include_once", "int", "instanceof", "insteadof", "interface", "isset", "list", "mixed", "namespace", "new", "null", "numeric", "or", "print", "private", "protected", "public", "require", "require_once", "resource", "return", "scalar", "static", "string", "switch", "throw", "trait", "true", "try", "unset", "use", "var", "while", "xor" };
+				if (keywords.Contains(mod)) mod = mod + "_";
+				keywords = keywords.Union(new string[] { "ds", "init", "page", "qmodule", "qpage", "stage" }).ToArray();
+				if (keywords.Contains(func)) func = func + "_";
 
 				var myType = loadAssembly(AssemblyType.module, mod);
+				string methodName = "";
+
+				var args = new Dict();
+				if (page.has("id")) args.set("id", page.get("id"));
 
 				try {
 					var myInstance = Activator.CreateInstance(myType, this);
+					MethodInfo method;
 
-					MethodInfo method = myType.GetMethod(page.get("func"));
+					method = myType.GetMethod("init");
+					method.Invoke(myInstance, new object[] { args });
+
+					method = myType.GetMethod(func);
 					if (method == null) method = myType.GetMethod("main");
-					if (method == null) throw new Exception("Function " + page.get("func") + " not found in module " + mod);
+					if (method == null) throw new Exception(string.Format("Method {0} not found in module {1}", page.get("func"), mod));
+					methodName = method.Name;
 
-					var args = new Dict();
-					if (page.has("id")) args.set("id", page.get("id"));
 					var xout = method.Invoke(myInstance, new object[] { args });
 					return xout.ToString();
+				} catch (TargetParameterCountException ex) {
+					return string.Format("Err#xx: Method \"{0}\" must have following signature: public string {0}(Dict args);", methodName); ;
 				} catch (Exception ex) {
 					var exx = ex.InnerException == null ? ex : (ex.InnerException.InnerException == null ? ex.InnerException : ex.InnerException.InnerException);
 					return "Exception: " + exx.Message + " at " + exx.Source + "\n" + String.Join("\n", exx.StackTrace);
@@ -466,47 +480,20 @@ namespace com.qetrix.libs
 		}
 
 
-		/*public string loadModule2(string path, PathMode pathMode)
-		{
-			var page = this.parsePath(path);
-
-			if (pathMode != PathMode.direct) {
-				var mod = page.get("mod");
-				mod = mod.Substring(0, 1).ToUpper() + mod.Substring(1);
-
-				var dir = AppDomain.CurrentDomain.BaseDirectory.Replace("\\", "/");
-				var myAssembly = Assembly.LoadFile(dir + "/modules/" + mod + ".dll");
-
-				Type myType = null;
-				myType = myAssembly.GetType("com.qetrix.apps." + _appName + ".modules." + mod);
-				if (myType == null) myType = myAssembly.GetType("com.qetrix.apps.shared.modules." + mod);
-				var myInstance = Activator.CreateInstance(myType);
-
-				MethodInfo method = myType.GetMethod(page.get("func"));
-				if (method == null) method = myType.GetMethod("main");
-				if (method == null) throw new Exception("Function " + page.get("func") + " not found in module " + mod);
-
-				var args = new Dict();
-				var xout = method.Invoke(myInstance, new object[] { args });
-				return xout.ToString();
-			}
-
-			return "404 Not Found";
-		}*/
-
 		public Type loadAssembly(string type, string name)
 		{
 			var dir = AppDomain.CurrentDomain.BaseDirectory.Replace("\\", "/").TrimEnd('/') + "/";
-			var file = dir + type + "s/" + name + ".dll";
+			var file = string.Format("{0}{1}s/{2}.dll", dir, type, name);
 
-			if (!File.Exists(file)) throw new Exception(type + " not found: " + file);
+			if (!File.Exists(file)) throw new Exception(string.Format("{0} not found: {1}", type, file));
 			//Assembly myAssembly = loadAssembly(file);
-			Assembly myAssembly = _config["fwk"] == "fram" ? loadAssemblyNet(file) : loadAssemblyCore(file);
+			 Assembly myAssembly = _config["fwk"] == "fram" ? loadAssemblyNet(file) : loadAssemblyCore(file);
 
-			if (myAssembly == null) throw new Exception("Invalid " + type + " " + name + " in " + file);
+			if (myAssembly == null) throw new Exception(string.Format("Invalid {0} {1} in {2}", type, name, file));
 
 			Type myType = null;
-			var strType = "com.qetrix." + type + "s." + myAssembly.ManifestModule.ScopeName.Substring(0, myAssembly.ManifestModule.ScopeName.Length - 4);
+			var strType = string.Format("com.qetrix.{0}s.{1}", type, myAssembly.ManifestModule.ScopeName.Substring(0, myAssembly.ManifestModule.ScopeName.Length - 4));
+			//var strType = "com.qetrix." + type + "s." + myAssembly.ManifestModule.ScopeName.Substring(0, myAssembly.ManifestModule.ScopeName.Length - 4);
 			myType = myAssembly.GetType(strType);
 
 			if (myType == null) {
@@ -521,16 +508,6 @@ namespace com.qetrix.libs
 
 			return myType;
 		}
-
-		/*public IEnumerable<Type> GetLoadableTypes(this Assembly assembly)
-		{
-			// TODO: Argument validation
-			try {
-				return assembly.GetTypes();
-			} catch (ReflectionTypeLoadException e) {
-				return e.Types.Where(t => t != null);
-			}
-		}*/
 
 		public DataStore loadDataStore(string alias, Type myType, string host, string scope = "", string prefix = "", string username = "", string password = "")
 		{
@@ -583,14 +560,42 @@ namespace com.qetrix.libs
 			return false;
 		}
 
+		public bool session()
+		{
+			return _sessionData.Count() > 0;
+		}
+
+		public string session(string key)
+		{
+			return _sessionData.ContainsKey(key) ? _sessionData[key] : "";
+		}
+
+		public QPage session(string key, string value)
+		{
+			if (value == null) {
+				_sessionData.Remove(key);
+			} else {
+				_sessionData[key] = value;
+			}
+			return this;
+		}
+
+		public QPage data(string key, string value)
+		{
+			if (!_data.ContainsKey(key)) _data.Add(key, value);
+			return this;
+		}
 	}
 
+	/** QModuleStage enum, also used as log level
+	 * @link https://www.quiky.net/QetriX/Stage
+	 */
 	public enum QModuleStage
 	{
-		debug = 0, // Verbose debug info, enable only if something wents really wrong
-		dev = 1,   // Basic debug info, stack trace, default for localhost/dev env
-		test = 2,  // No debug info, prints warnings and errors. Like production, with DS mockups for sending e-mails, WS push requests etc.
-		prod = 3,  // Production, warnings/error messages are logged, not printed.
+		debug = 1, // Verbose debug info, enable only if something wents really wrong.
+		dev = 2,   // Basic debug info, stack trace, default for localhost/dev env.
+		test = 3,  // No debug info, prints warnings and errors. Like production, with DS mockups for sending e-mails, WS push requests etc. For staging env.
+		prod = 4,  // Production, warnings/error messages are logged, not printed.
 	}
 
 	public enum PathMode
