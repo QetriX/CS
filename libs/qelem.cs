@@ -72,20 +72,12 @@ namespace com.qetrix.libs
 		{
 			this._name = name;
 			this._valueType = type;
-			/*if ((type > 99 && type < 200) || name.Substring(name.Length - 2, 2) == "_r") {
-				this._ds = name.Substring(0, name.Length - 2);
-				this.value(value);
-			}*/
 		}
 
 		public QElem(ElemType type, string name, string label, string value, int order, List<Dictionary<string, string>> items)
 		{
 			this._name = name;
 			this._valueType = type;
-			/*if ((type > 99 && type < 200) || name.Substring(name.Length - 2, 2) == "_r") {
-				this._ds = name.Substring(0, name.Length - 2);
-				this.value(value);
-			}*/
 		}
 
 		public string dsname()
