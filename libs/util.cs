@@ -12,25 +12,47 @@ namespace com.qetrix.libs
 	public static class Util
 	{
 		#region String functions
-		public static String urlEncode(String inString)
+		public static String urlEncode(String str)
 		{
 			StringBuilder sb = new StringBuilder();
 			int limit = 32000;
-			int loops = inString.Length / limit;
+			int loops = str.Length / limit;
 
 			// EscapeDataString is limited, for larger Strings we have to break it down into smaller increments
 			for (int i = 0; i <= loops; i++) {
-				if (i < loops) sb.Append(Uri.EscapeDataString(inString.Substring(limit * i, limit)));
-				else sb.Append(Uri.EscapeDataString(inString.Substring(limit * i)));
+				if (i < loops) sb.Append(Uri.EscapeDataString(str.Substring(limit * i, limit)));
+				else sb.Append(Uri.EscapeDataString(str.Substring(limit * i)));
 			}
 
-			return sb.ToString().Replace(" ", "+");
+			return sb.ToString().Replace(" ", "+").Replace("%21", "!");
 		}
 
 		public static String urlDecode(String text)
 		{
 			text = text.Replace("+", " ");
 			return System.Uri.UnescapeDataString(text);
+		}
+
+		public static string base64Encode(string str)
+		{
+			return Convert.ToBase64String(Encoding.UTF8.GetBytes(str)).Replace('+', '-').Replace('/', '_').Replace('=', ',');
+		}
+
+		public static string base64Decode(string str)
+		{
+			return Encoding.UTF8.GetString(Convert.FromBase64String(str.Replace('-', '+').Replace('_', '/').Replace(',', '=')));
+		}
+
+		/**
+		 * Generates Universal Unique ID ("UUID" or "GUID")
+		 *
+		 * @param bool compressed Will be printed without dashes
+		 *
+		 * @return string
+		 */
+		public static string uuid(bool compressed = false) // !!! TODO FIXME !!! Check compatibilty with PHP, may be different format ************************************************************ https://stackoverflow.com/questions/8477664/how-can-i-generate-uuid-in-c-sharp
+		{
+			return compressed ? Guid.NewGuid().ToString().Replace("-", "") : Guid.NewGuid().ToString();
 		}
 
 		public static string array_shift(ref List<string> arr)
@@ -52,7 +74,7 @@ namespace com.qetrix.libs
 			return arr;
 		}
 
-		public static String crKey(String text)
+		public static String toPath(String text)
 		{
 			String stFormD = Util.normalizeString(text);
 			int len = stFormD.Length;
@@ -70,7 +92,7 @@ namespace com.qetrix.libs
 			return output;
 		}
 
-		public static String crKeyRev(String text)
+		public static String toPathRev(String text)
 		{
 			var s = text.Replace("-", " ");
 			s = Regex.Replace(s, @"(^\w)|(\s\w)", m => m.Value.ToUpper());
@@ -111,7 +133,8 @@ namespace com.qetrix.libs
 
 		public static bool isActionPath(string value)
 		{
-			return value.Contains("/") && !value.Contains("\t");
+			value = value.Trim();
+			return value.Length == 0 || (value.Contains("/") && !value.Contains("\t")) || value.StartsWith("tel:") || value.StartsWith("mailto:");
 		}
 
 		public static String log(String str)
@@ -167,6 +190,14 @@ namespace com.qetrix.libs
 				return "Exception: " + ex.InnerException.Message + " at " + ex.InnerException.Source + "\n" + String.Join("\n", ex.InnerException.StackTrace);
 			}
 		}
+
+		/// EXAMPLE: readResourceFile(Assembly.GetExecutingAssembly(), "assembly.namespace.subdir.filename.ext");
+		public static string readResourceFile(Assembly assembly, string filenameWithNamespace)
+		{
+			using (var stream = assembly.GetManifestResourceStream(filenameWithNamespace)) {
+				using (var reader = new System.IO.StreamReader(stream)) return reader.ReadToEnd();
+			}
+		}
 	}
 
 	public class Dict : IEnumerable<KeyValuePair<string, string>>
@@ -175,6 +206,11 @@ namespace com.qetrix.libs
 
 		public Dict()
 		{
+		}
+
+		public Dict(Dictionary<string, string> data)
+		{
+			_data = data;
 		}
 
 		public string get(string key)
