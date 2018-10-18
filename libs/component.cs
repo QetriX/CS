@@ -139,5 +139,6 @@ namespace com.qetrix.libs
 		{
 			return this.features.Contains(feature.ToLower());;
 		}
+
 	}
 }
