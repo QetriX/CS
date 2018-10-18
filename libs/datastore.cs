@@ -77,6 +77,11 @@ namespace com.qetrix.libs
 			return _page;
 		}
 
+		public string file(string name)
+		{
+			throw new NotImplementedException();
+		}
+
 		/*public object run(string value, Dict args)
 		{
 			Type thisType = this.GetType();
